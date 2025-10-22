@@ -32,7 +32,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const user = userQuery.rows[0];
 
-    // ⚠️ If password is not hashed, simple comparison:
     if (user.password !== password) {
       return res.status(401).json({ error: "Invalid password" });
     }
