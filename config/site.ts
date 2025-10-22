@@ -13,16 +13,8 @@ export const siteConfig = {
       href: "/login",
     },
     {
-      label: "Docs",
-      href: "/docs",
-    },
-    {
-      label: "Pricing",
-      href: "/pricing",
-    },
-    {
-      label: "Blog",
-      href: "/blog",
+      label: "Register",
+      href: "/register",
     },
     {
       label: "About",
@@ -64,11 +56,12 @@ export const siteConfig = {
     },
   ],
   links: {
-    github: "https://github.com/heroui-inc/heroui",
+    github: "https://github.com/VurseDev/atlas-warehouse",
     twitter: "https://twitter.com/hero_ui",
     docs: "https://heroui.com",
     discord: "https://discord.gg/9b6yyZKmH4",
     sponsor: "https://patreon.com/jrgarciadev",
     login: "localhost:3000/login",
+    register:"localhost:3000/register",
   },
 };
