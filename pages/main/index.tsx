@@ -462,8 +462,8 @@ export default function MainPage() {
                   />
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Imagem do Produto
+                    <label htmlFor="image-upload" className="text-sm font-medium text-foreground">
+                        Imagem do Produto
                     </label>
                     <input
                       ref={fileInputRef}
