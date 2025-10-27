@@ -18,66 +18,60 @@ import {
   Image,
   useDisclosure,
 } from "@heroui/react";
-import { Plus, Upload, Package, X, Search, Download } from "lucide-react";
+import { Plus, Upload, Package, X, Search, Download, FileText } from "lucide-react";
 import Papa from "papaparse";
 
 export default function MainPage() {
+  const router = useRouter();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
-  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+  const [imagePreview, setImagePreview] = React.useState(null);
   const [mounted, setMounted] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [formData, setFormData] = React.useState({
     name: "",
     description: "",
     supplier: "",
     code: "",
   });
-   
 
-  const [errors, setErrors] = React.useState<any>({});
-  const [submitted, setSubmitted] = React.useState<any>(null);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const csvInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [products, setProducts] = React.useState<any[]>([]);
+  const [errors, setErrors] = React.useState({});
+  const [submitted, setSubmitted] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+  const csvInputRef = React.useRef(null);
+  const [products, setProducts] = React.useState([]);
   const [suppliers, setSuppliers] = React.useState([]);
 
-React.useEffect(() => {
-  setMounted(true);
+  React.useEffect(() => {
+    setMounted(true);
 
-  const fetchProducts = async () => {
-    try {
-      const res = await fetch("/api/regprods");
-      const data = await res.json();
-      setProducts(data);
-    } catch (err) {
-      console.error("Failed to load products:", err);
-    }
-  };
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch("/api/regprods");
+        const data = await res.json();
+        setProducts(data);
+      } catch (err) {
+        console.error("Failed to load products:", err);
+      }
+    };
 
-  const fetchSuppliers = async () => {
-    try {
-      const res = await fetch("/api/regforn");
-      const data = await res.json();
-      setSuppliers(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to load suppliers:", err);
-    }
-  };
+    const fetchSuppliers = async () => {
+      try {
+        const res = await fetch("/api/regforn");
+        const data = await res.json();
+        setSuppliers(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load suppliers:", err);
+      }
+    };
 
-  fetchProducts();
-  fetchSuppliers();
-}, []);
+    fetchProducts();
+    fetchSuppliers();
+  }, []);
 
-
-  // Handle image file selection and preview  
-
-const handleImageChange = (e) => {
+  const handleImageChange = (e) => {
     const file = e.target.files[0];
-
     if (file) {
-
       const reader = new FileReader();
-
       reader.onloadend = () => {
         setImagePreview(reader.result);
       };
@@ -85,30 +79,26 @@ const handleImageChange = (e) => {
     }
   };
 
-  // Remove selected image
   const removeImage = () => {
     setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
- // Handle form submission
-  const router = useRouter()
   const handleSubmit = async () => {
-    // Validation
     if (!formData.name || !formData.description || !formData.supplier || !formData.code) {
       setErrors({ api: "Preencha todos os campos obrigatórios." });
       return;
     }
 
     const data = {
-    p_name: formData.name, // was name
-    description: formData.description,
-    code: formData.code,
-    p_type: formData.supplier, // using supplier as type
-    quantity: 0,
-    image: imagePreview,
-  };
-  
+      p_name: formData.name,
+      description: formData.description,
+      code: formData.code,
+      p_type: formData.supplier,
+      quantity: 0,
+      image: imagePreview,
+    };
+
     try {
       const res = await fetch("/api/regprods", {
         method: "POST",
@@ -129,7 +119,6 @@ const handleImageChange = (e) => {
       setSubmitted(result);
       console.log("✅ Produto registrado:", result);
 
-      // Reset fields
       setFormData({
         name: "",
         description: "",
@@ -138,16 +127,14 @@ const handleImageChange = (e) => {
       });
       setImagePreview(null);
       setErrors({});
-      onOpenChange(); // close modal
-
+      onOpenChange();
     } catch (err) {
       console.error(err);
       setErrors({ api: "Erro de conexão com o servidor" });
     }
   };
 
-  if (!mounted) return null;
-
+  // Handle CSV Export
   const handleExportCSV = () => {
     const csvData = products.map(p => ({
       Nome: p.p_name,
@@ -229,11 +216,9 @@ const handleImageChange = (e) => {
     p.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar */} 
+      {/* Navbar */}
       <nav className="sticky top-0 z-50 border-b border-divider bg-content1/80 backdrop-blur-md">
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
@@ -265,22 +250,29 @@ const handleImageChange = (e) => {
             </div>
           </div>
         </div>
-
       </nav>
 
-{/* Products Grid */}
+      {/* Products Grid */}
       <main className="container mx-auto px-4 py-8">
-        
-                <div className="mb-6">
-                  <Input
-                    placeholder="Buscar produtos nos produtos..."
-                    startContent={<Search size={20} />}
-                    size="lg"
-                    classNames={{ base: "max-w-md" }}
-                  />
+        <div className="mb-6">
+          <h2 className="text-3xl font-bold text-foreground mb-2">Produtos</h2>
+          <p className="text-default-500">Gerencie seus produtos e estoque</p>
+        </div>
 
-
-                   <div className="flex gap-2">
+        {/* Search Bar and CSV Buttons */}
+        <div className="mb-6 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <Input
+            placeholder="Buscar produtos..."
+            startContent={<Search size={20} />}
+            size="lg"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            classNames={{
+              base: "max-w-md",
+            }}
+          />
+          
+          <div className="flex gap-2">
             <input
               ref={csvInputRef}
               type="file"
@@ -309,12 +301,9 @@ const handleImageChange = (e) => {
           </div>
         </div>
 
-                
-        <h2 className="text-3xl font-bold mb-4">Produtos</h2>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {products.length > 0 ? (
-            products.map((p) => (
+          {filteredProducts.length > 0 ? (
+            filteredProducts.map((p) => (
               <Card key={p.code}>
                 <CardBody className="flex flex-col items-center text-center gap-2">
                   <Image
@@ -334,13 +323,26 @@ const handleImageChange = (e) => {
             <Card className="border-2 border-dashed border-default-300">
               <CardBody className="flex flex-col items-center justify-center h-48">
                 <Package size={48} className="text-default-400 mb-2" />
-                <p className="text-default-500">Nenhum produto cadastrado</p>
+                <p className="text-default-500">
+                  {searchQuery ? "Nenhum produto encontrado" : "Nenhum produto cadastrado"}
+                </p>
+                {!searchQuery && (
+                  <Button
+                    size="sm"
+                    color="primary"
+                    variant="flat"
+                    className="mt-2"
+                    onPress={onOpen}
+                  >
+                    Adicionar Produto
+                  </Button>
+                )}
               </CardBody>
             </Card>
           )}
         </div>
-        
       </main>
+
       {/* Registration Modal */}
       <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
         <ModalContent>
