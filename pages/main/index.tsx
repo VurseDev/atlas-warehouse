@@ -18,7 +18,8 @@ import {
   Image,
   useDisclosure,
 } from "@heroui/react";
-import { Plus, Upload, Package, X, Search } from "lucide-react";
+import { Plus, Upload, Package, X, Search, Download } from "lucide-react";
+import Papa from "papaparse";
 
 export default function MainPage() {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -35,9 +36,10 @@ export default function MainPage() {
   const [errors, setErrors] = React.useState<any>({});
   const [submitted, setSubmitted] = React.useState<any>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const csvInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [products, setProducts] = React.useState<any[]>([]);
-
-const [suppliers, setSuppliers] = React.useState([]);
+  const [suppliers, setSuppliers] = React.useState([]);
 
 React.useEffect(() => {
   setMounted(true);
@@ -146,6 +148,89 @@ const handleImageChange = (e) => {
 
   if (!mounted) return null;
 
+  const handleExportCSV = () => {
+    const csvData = products.map(p => ({
+      Nome: p.p_name,
+      Descrição: p.description,
+      Código: p.code,
+      Tipo: p.p_type,
+      Quantidade: p.quantity
+    }));
+
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `produtos_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Handle CSV Import
+  const handleImportCSV = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const importedProducts = results.data.map((row) => ({
+            p_name: row.Nome || row.name || '',
+            description: row.Descrição || row.description || '',
+            code: row.Código || row.code || '',
+            p_type: row.Tipo || row.type || '',
+            quantity: parseInt(row.Quantidade || row.quantity || '0'),
+            image: null
+          }));
+
+          for (const product of importedProducts) {
+            if (product.p_name && product.code) {
+              const res = await fetch("/api/regprods", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(product),
+              });
+
+              if (res.ok) {
+                const result = await res.json();
+                setProducts((prev) => [...prev, result]);
+              }
+            }
+          }
+
+          alert(`${importedProducts.length} produtos importados com sucesso!`);
+        } catch (err) {
+          console.error("Erro ao importar CSV:", err);
+          alert("Erro ao importar CSV");
+        }
+      },
+      error: (error) => {
+        console.error("Erro ao ler CSV:", error);
+        alert("Erro ao ler arquivo CSV");
+      }
+    });
+
+    if (csvInputRef.current) {
+      csvInputRef.current.value = '';
+    }
+  };
+
+  if (!mounted) return null;
+
+  const filteredProducts = products.filter((p) =>
+    p.p_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */} 
@@ -193,7 +278,38 @@ const handleImageChange = (e) => {
                     size="lg"
                     classNames={{ base: "max-w-md" }}
                   />
-                </div>
+
+
+                   <div className="flex gap-2">
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+              id="csv-upload"
+            />
+            <Button
+              as="label"
+              htmlFor="csv-upload"
+              variant="bordered"
+              startContent={<Upload size={18} />}
+              className="cursor-pointer"
+            >
+              Importar CSV
+            </Button>
+            <Button
+              variant="bordered"
+              startContent={<Download size={18} />}
+              onPress={handleExportCSV}
+              isDisabled={products.length === 0}
+            >
+              Exportar CSV
+            </Button>
+          </div>
+        </div>
+
+                
         <h2 className="text-3xl font-bold mb-4">Produtos</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
