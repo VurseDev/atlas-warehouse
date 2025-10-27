@@ -116,7 +116,7 @@ export default function MainPage() {
     fetchSuppliers();
   }, []);
 
-  const handleImageChange = (e) => {
+  const handleImageChange = (e: React.FormEvent<HTMLFormElement>) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
