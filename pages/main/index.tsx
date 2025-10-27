@@ -1,3 +1,43 @@
+
+/**
+ * MainPage component for managing products and inventory.
+ * 
+ * This component fetches products and suppliers from the API, allows users to add new products,
+ * and provides functionality to import and export product data in CSV format.
+ * 
+ * @component
+ * @returns {JSX.Element} The rendered MainPage component.
+ * 
+ * @hooks
+ * - useRouter: For navigation between pages.
+ * - useDisclosure: For managing the modal state.
+ * - useState: For managing local state including image preview, form data, errors, and product lists.
+ * - useEffect: For fetching products and suppliers on component mount.
+ * 
+ * @state
+ * - imagePreview: The preview of the uploaded image.
+ * - mounted: Indicates if the component has mounted.
+ * - searchQuery: The current search query for filtering products.
+ * - formData: The data for the product registration form.
+ * - errors: Any validation or API errors.
+ * - submitted: The submitted product data.
+ * - products: The list of products fetched from the API.
+ * - suppliers: The list of suppliers fetched from the API.
+ * 
+ * @functions
+ * - handleImageChange: Handles image file selection and sets the image preview.
+ * - removeImage: Resets the image preview and file input.
+ * - handleSubmit: Validates and submits the product registration form.
+ * - handleExportCSV: Exports the current products list to a CSV file.
+ * - handleImportCSV: Imports products from a selected CSV file and registers them.
+ * 
+ * @render
+ * - Navbar: Contains navigation links and a button to add a new product.
+ * - Search Bar: Allows users to search for products.
+ * - Products Grid: Displays the list of products with options to import/export CSV.
+ * - Registration Modal: A modal for registering a new product with form fields.
+ */
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -18,7 +58,7 @@ import {
   Image,
   useDisclosure,
 } from "@heroui/react";
-import { Plus, Upload, Package, X, Search, Download, FileText } from "lucide-react";
+import { Plus, Upload, Package, X, Search, Download as DownloadIcon, FileText } from "lucide-react";
 import Papa from "papaparse";
 
 export default function MainPage() {
@@ -58,7 +98,15 @@ export default function MainPage() {
       try {
         const res = await fetch("/api/regforn");
         const data = await res.json();
-        setSuppliers(Array.isArray(data) ? data : []);
+
+            // Map the API response to the format the Select expects
+    const formattedSuppliers = data.map((supplier: any) => ({
+      value: supplier.s_id.toString(), // or supplier.s_name
+      label: supplier.s_name
+    }));
+    
+      console.log("Formatted suppliers:", formattedSuppliers);
+    setSuppliers(formattedSuppliers);
       } catch (err) {
         console.error("Failed to load suppliers:", err);
       }
@@ -292,7 +340,7 @@ export default function MainPage() {
             </Button>
             <Button
               variant="bordered"
-              startContent={<Download size={18} />}
+              startContent={<DownloadIcon size={18} />}
               onPress={handleExportCSV}
               isDisabled={products.length === 0}
             >
@@ -396,7 +444,7 @@ export default function MainPage() {
                     onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
                   >
                     {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.value} value={supplier.value}>
+                      <SelectItem key={supplier.value} value={supplier.value} textValue={supplier.label}>
                         {supplier.label}
                       </SelectItem>
                     ))}
