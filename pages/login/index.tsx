@@ -16,7 +16,7 @@ export default function App() {
   const [errors, setErrors] = React.useState({});
 
 
-  const onSubmit = async (e) => {
+ const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.currentTarget));
 
