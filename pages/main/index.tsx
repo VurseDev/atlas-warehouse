@@ -64,7 +64,7 @@ import Papa from "papaparse";
 export default function MainPage() {
   const router = useRouter();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
-  const [imagePreview, setImagePreview] = React.useState(null);
+  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [mounted, setMounted] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [formData, setFormData] = React.useState({
