@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import React from "react";
 import {
   Form,
@@ -15,7 +16,7 @@ export default function App() {
   const [submitted, setSubmitted] = React.useState(null);
   const [errors, setErrors] = React.useState({});
 
-
+ const router = useRouter();
  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.currentTarget));
@@ -35,7 +36,7 @@ export default function App() {
     const result = await res.json();
 
    if (!res.ok) {
-    // Check for 401 (unauthorized)
+    
     if (res.status === 401) {
       setErrors({ api: result.error || "Usuário inválido ou senha incorreta" });
     } else {
@@ -43,7 +44,7 @@ export default function App() {
     }
     return;
   }
-  
+ router.push("/main");
 setSubmitted(result);
   } catch (err) {
     console.error(err);
