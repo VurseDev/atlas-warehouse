@@ -8,21 +8,6 @@
  * @returns {JSX.Element} The rendered MainPage component.
  */
 
-interface Product {
-  p_id?: number;
-  code: string;
-  p_name: string;
-  description: string;
-  p_type: string;
-  quantity: number;
-  image?: string | null;
-}
-
-interface Supplier {
-  value: string;
-  label: string;
-}
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -50,6 +35,21 @@ import {
 import { Plus, Upload, Package, X, Search, Download as DownloadIcon, FileText, Edit, Trash, Eye, Info, RefreshCw } from "lucide-react";
 import Papa from "papaparse";
 
+interface Product {
+  p_id?: number;
+  code: string;
+  p_name: string;
+  description: string;
+  p_type: string;
+  quantity: number;
+  image?: string | null;
+}
+
+interface Supplier {
+  value: string;
+  label: string;
+}
+
 export default function MainPage() {
   const router = useRouter();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -63,15 +63,16 @@ export default function MainPage() {
     code: "",
   });
   const [isEditing, setIsEditing] = React.useState(false);
-  const [editingProduct, setEditingProduct] = React.useState(null);
+  const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
+  const [openPopoverId, setOpenPopoverId] = React.useState<string | null>(null);
 
-  const [errors, setErrors] = React.useState({});
-  const [submitted, setSubmitted] = React.useState(null);
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = React.useState<any>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const csvInputRef = React.useRef(null);
-  const [products, setProducts] = React.useState([]);
-  const [suppliers, setSuppliers] = React.useState([]);
-  const [selectedProduct, setSelectedProduct] = React.useState(null);
+  const csvInputRef = React.useRef<HTMLInputElement>(null);
+  const [products, setProducts] = React.useState<Product[]>([]);
+  const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
+  const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -95,7 +96,7 @@ export default function MainPage() {
         const res = await fetch("/api/regforn");
         const data = await res.json();
 
-        const formattedSuppliers = data.map((supplier: any) => ({
+        const formattedSuppliers: Supplier[] = data.map((supplier: any) => ({
           value: supplier.s_id.toString(),
           label: supplier.s_name
         }));
@@ -142,7 +143,7 @@ export default function MainPage() {
   };
 
   // Open modal for editing existing product
-  const handleEditProduct = (product) => {
+  const handleEditProduct = (product: Product) => {
     setIsEditing(true);
     setEditingProduct(product);
     setFormData({
@@ -153,6 +154,10 @@ export default function MainPage() {
     });
     setImagePreview(product.image || null);
     setErrors({});
+    
+    // Close the popover
+    setOpenPopoverId(null);
+    
     onOpen();
   };
 
@@ -167,13 +172,13 @@ export default function MainPage() {
       description: formData.description,
       code: formData.code,
       p_type: formData.supplier,
-      quantity: isEditing ? editingProduct.quantity : 0,
+      quantity: isEditing && editingProduct ? editingProduct.quantity : 0,
       image: imagePreview,
     };
 
     try {
       let res;
-      if (isEditing) {
+      if (isEditing && editingProduct) {
         // Update existing product
         res = await fetch(`/api/regprods?code=${editingProduct.code}`, {
           method: "PUT",
@@ -210,7 +215,7 @@ export default function MainPage() {
       });
 
       // Update products list
-      if (isEditing) {
+      if (isEditing && editingProduct) {
         setProducts(prev => prev.map(p => 
           p.code === editingProduct.code ? { ...p, ...data } : p
         ));
@@ -265,16 +270,16 @@ export default function MainPage() {
   };
 
   // Handle CSV Import
-  const handleImportCSV = (e) => {
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
+      complete: async (results: any) => {
         try {
-          const importedProducts = results.data.map((row) => ({
+          const importedProducts = results.data.map((row: any) => ({
             p_name: row.Nome || row.name || '',
             description: row.Descrição || row.description || '',
             code: row.Código || row.code || '',
@@ -317,7 +322,7 @@ export default function MainPage() {
           });
         }
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error("Erro ao ler CSV:", error);
         addToast({
           title: "Erro no Arquivo",
@@ -522,7 +527,14 @@ export default function MainPage() {
             Array.from({ length: 8 }).map((_, i) => <ProductSkeleton key={i} />)
           ) : filteredProducts.length > 0 ? (
             filteredProducts.map((p) => (
-              <Popover key={p.code} placement="bottom" showArrow offset={10}>
+              <Popover 
+                key={p.code} 
+                placement="bottom" 
+                showArrow 
+                offset={10}
+                isOpen={openPopoverId === p.code}
+                onOpenChange={(isOpen) => setOpenPopoverId(isOpen ? p.code : null)}
+              >
                 <PopoverTrigger>
                   <Card 
                     className="cursor-pointer transition-all hover:scale-105 hover:shadow-lg"
@@ -710,7 +722,7 @@ export default function MainPage() {
                     variant="bordered"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    isDisabled={isEditing} // Disable code editing to maintain consistency
+                    isDisabled={isEditing}
                     description={isEditing ? "O código do produto não pode ser alterado" : ""}
                   />
 
