@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const result = await pool.query(
-        "INSERT INTO product (code, p_name, description, p_type, quantity, image) VALUES ($1, $2, $3, $4, $5, $6)RETURNING code, p_name, description, p_type, quantity, image",
+        "INSERT INTO product (code, p_name, description, p_type, quantity, image) VALUES ($1, $2, $3, $4, $5, $6) RETURNING code, p_name, description, p_type, quantity, image",
         [code, p_name, description, p_type, quantity || 0, image || null]
       );
 
@@ -36,9 +36,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         "SELECT code, p_name, description, p_type, quantity, image FROM product ORDER BY p_id DESC"
       );
       return res.status(200).json(result.rows);
-    } catch (error: any) {
+    } catch (error:  any) {
       console.error("API Error (GET):", error);
       return res.status(500).json({ error: "Failed to fetch products" });
+    }
+  }
+
+  if (req.method === "DELETE") {
+    try {
+      const { id } = req.query;
+
+      if (!id) {
+        return res.status(400).json({ error: "Product ID is required" });
+      }
+
+      await pool.query("DELETE FROM product WHERE p_id = $1", [id]);
+
+      return res.status(200).json({ success: true, message: "Product deleted!" });
+    } catch (error: any) {
+      console.error("API Error (DELETE):", error);
+      return res.status(500).json({ error: "Failed to delete product" });
     }
   }
 
