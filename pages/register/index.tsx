@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import React from "react";
 import {
   Form,
@@ -7,13 +8,15 @@ import {
   Checkbox,
   Button,
   Image,
+  addToast,
 } from "@heroui/react";
 
 export default function App() {
   const [password, setPassword] = React.useState("");
   const [submitted, setSubmitted] = React.useState(null);
   const [errors, setErrors] = React.useState({});
-
+  const [isLoading, setIsLoading] = React.useState(false);
+  const router = useRouter();
   // Real-time password validation
   const getPasswordError = (value) => {
     if (value.length < 4) {
@@ -30,46 +33,77 @@ export default function App() {
   };
 
   const onSubmit = async (e) => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.currentTarget));
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.currentTarget));
 
-  // Custom validation checks
-  const newErrors = {};
+    // Custom validation checks
+    const newErrors = {};
 
-  // Password validation
-  const passwordError = getPasswordError(data.password);
-  if (passwordError) newErrors.password = passwordError;
+    // Password validation
+    const passwordError = getPasswordError(data.password);
+    if (passwordError) newErrors.password = passwordError;
 
-  if (data.name === "admin") newErrors.name = "ta facil";
-  if (data.terms !== "true") newErrors.terms = "Por favor aceite os termos.";
+    if (data.name === "admin") newErrors.name = "ta facil";
+    if (data.terms !== "true") newErrors.terms = "Por favor aceite os termos.";
 
-  if (Object.keys(newErrors).length > 0) {
-    setErrors(newErrors);
-    return;
-  }
-
-  setErrors({});
-
-  try {
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setErrors({ api: result.error || "Erro ao registrar" });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
-    setSubmitted(result);
-  } catch (err) {
-    console.error(err);
-    setErrors({ api: "Erro de conexão com o servidor" });
-  }
-};
+    setErrors({});
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setErrors({ api: result.error || "Erro ao registrar" });
+        
+        // Toast de erro
+        addToast({
+          title: "Erro no Registro",
+          description: result.error || "Erro ao registrar",
+          color: "danger",
+          timeout: 5000,
+        });
+        return;
+      }
+
+      // Toast de sucesso
+      addToast({
+        title: "Registro realizado com sucesso!",
+        description: "Bem-vindo ao Atlas!",
+        color: "success",
+        timeout: 4000,
+      });
+    setTimeout(() => {
+        router.push("/login");
+      }, 1000);
+      
+      setSubmitted(result);
+    } catch (err) {
+      console.error(err);
+      setErrors({ api: "Erro de conexão com o servidor" });
+      
+      // Toast de erro de conexão
+      addToast({
+        title: "Erro de Conexão",
+        description: "Erro de conexão com o servidor",
+        color: "danger",
+        timeout: 5000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <Form
@@ -78,23 +112,22 @@ export default function App() {
         onReset={() => setSubmitted(null)}
         onSubmit={onSubmit}
       >
-         <div className="flex flex-col gap-4 max-w-md">
-                {/* Logo and Brand Name Section */}
-                <div className="flex flex-col items-center gap-3 mb-6">
-                  <div className="flex items-center gap-4">
-                    <Image
-                      src="./logo.png"
-                      alt="Company Logo"
-                      width={130}
-                      height={80}
-                      isBlurred
-                    />
-                    <h1 className="text-5xl font-bold text-foreground">
-                      Atlas
-                    </h1>
-                  </div>
-                </div>
-        
+        <div className="flex flex-col gap-4 max-w-md">
+          {/* Logo and Brand Name Section */}
+          <div className="flex flex-col items-center gap-3 mb-6">
+            <div className="flex items-center gap-4">
+              <Image
+                src="./logo.png"
+                alt="Company Logo"
+                width={130}
+                height={80}
+                isBlurred
+              />
+              <h1 className="text-5xl font-bold text-foreground">
+                Atlas
+              </h1>
+            </div>
+          </div>
           
           <Input
             isRequired
@@ -102,7 +135,6 @@ export default function App() {
               if (validationDetails.valueMissing) {
                 return "Por favor digite seu nome";
               }
-
               return errors.name;
             }}
             label="Nome"
@@ -177,8 +209,13 @@ export default function App() {
           )}
 
           <div className="flex gap-4">
-            <Button className="w-full" color="primary" type="submit">
-              Registrar-se
+            <Button 
+              className="w-full" 
+              color="primary" 
+              type="submit"
+              isLoading={isLoading}
+            >
+              {isLoading ? "Registrando..." : "Registrar-se"}
             </Button>
           </div>
         </div>
@@ -191,4 +228,4 @@ export default function App() {
       </Form>
     </div>
   );
-}
+}             
