@@ -1,4 +1,5 @@
 import React from "react";
+import { useRouter } from "next/navigation";
 import {
   Form,
   Input,
@@ -22,6 +23,7 @@ interface FormData {
 type Errors = Record<string, string>;
 
 export default function Register() {
+  const router = useRouter();
   const [password, setPassword] = React.useState("");
   const [submitted, setSubmitted] = React.useState<any>(null);
   const [errors, setErrors] = React.useState<Errors>({});
@@ -102,6 +104,11 @@ export default function Register() {
         color: "success",
         timeout: 4000,
       });
+
+      // Redirect to login after successful registration
+      setTimeout(() => {
+        router.push("/login");
+      }, 2000);
 
       setSubmitted(result);
     } catch (err) {
@@ -237,6 +244,20 @@ export default function Register() {
             >
               {isLoading ? "Registrando..." : "Registrar-se"}
             </Button>
+          </div>
+
+          {/* Navigation link to login */}
+          <div className="text-center mt-4">
+            <p className="text-sm text-default-500">
+              Já tem uma conta?{" "}
+              <button
+                type="button"
+                className="text-blue-600 hover:underline cursor-pointer"
+                onClick={() => router.push("/login")}
+              >
+                Faça login
+              </button>
+            </p>
           </div>
         </div>
 
