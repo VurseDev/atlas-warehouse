@@ -707,7 +707,7 @@ export default function MainPage() {
                     onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
                   >
                     {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.value} value={supplier.value} textValue={supplier.label}>
+                      <SelectItem key={supplier.value} textValue={supplier.label}>
                         {supplier.label}
                       </SelectItem>
                     ))}
