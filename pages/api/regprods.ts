@@ -33,29 +33,75 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === "GET") {
     try {
       const result = await pool.query(
-        "SELECT code, p_name, description, p_type, quantity, image FROM product ORDER BY p_id DESC"
+        "SELECT p_id, code, p_name, description, p_type, quantity, image FROM product ORDER BY p_id DESC"
       );
       return res.status(200).json(result.rows);
-    } catch (error:  any) {
+    } catch (error: any) {
       console.error("API Error (GET):", error);
       return res.status(500).json({ error: "Failed to fetch products" });
     }
   }
+  
+  if (req.method === "PUT") {
+  try {
+    const { code } = req.query;
+    const { p_name, description, p_type, quantity, image } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: "Product code is required" });
+    }
+
+    const result = await pool.query(
+      "UPDATE product SET p_name = $1, description = $2, p_type = $3, quantity = $4, image = $5 WHERE code = $6 RETURNING code, p_name, description, p_type, quantity, image",
+      [p_name, description, p_type, quantity || 0, image || null, code]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    return res.status(200).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("API Error (PUT):", error);
+    return res.status(500).json({ error: "Failed to update product" });
+  }
+}
 
   if (req.method === "DELETE") {
     try {
-      const { id } = req.query;
+      const { id, code } = req.query;
 
-      if (!id) {
-        return res.status(400).json({ error: "Product ID is required" });
+      // If no identifier provided
+      if (!id && !code) {
+        return res.status(400).json({ error: 'Product ID or code is required' });
       }
 
-      await pool.query("DELETE FROM product WHERE p_id = $1", [id]);
+      let query;
+      let params;
+
+      // If id is provided and it's a number, use p_id
+      if (id && !isNaN(Number(id))) {
+        query = "DELETE FROM product WHERE p_id = $1";
+        params = [parseInt(id as string)];
+      } 
+      // If code is provided or id is a string (like "HS006"), use code
+      else if (code || (id && isNaN(Number(id)))) {
+        query = "DELETE FROM product WHERE code = $1";
+        params = [code || id];
+      } else {
+        return res.status(400).json({ error: 'Invalid product identifier' });
+      }
+
+      const result = await pool.query(query, params);
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
 
       return res.status(200).json({ success: true, message: "Product deleted!" });
     } catch (error: any) {
       console.error("API Error (DELETE):", error);
-      return res.status(500).json({ error: "Failed to delete product" });
+      return res.status(500).json({ error: error.message });
     }
   }
 

@@ -1,4 +1,3 @@
-
 /**
  * MainPage component for managing products and inventory.
  * 
@@ -7,35 +6,6 @@
  * 
  * @component
  * @returns {JSX.Element} The rendered MainPage component.
- * 
- * @hooks
- * - useRouter: For navigation between pages.
- * - useDisclosure: For managing the modal state.
- * - useState: For managing local state including image preview, form data, errors, and product lists.
- * - useEffect: For fetching products and suppliers on component mount.
- * 
- * @state
- * - imagePreview: The preview of the uploaded image.
- * - mounted: Indicates if the component has mounted.
- * - searchQuery: The current search query for filtering products.
- * - formData: The data for the product registration form.
- * - errors: Any validation or API errors.
- * - submitted: The submitted product data.
- * - products: The list of products fetched from the API.
- * - suppliers: The list of suppliers fetched from the API.
- * 
- * @functions
- * - handleImageChange: Handles image file selection and sets the image preview.
- * - removeImage: Resets the image preview and file input.
- * - handleSubmit: Validates and submits the product registration form.
- * - handleExportCSV: Exports the current products list to a CSV file.
- * - handleImportCSV: Imports products from a selected CSV file and registers them.
- * 
- * @render
- * - Navbar: Contains navigation links and a button to add a new product.
- * - Search Bar: Allows users to search for products.
- * - Products Grid: Displays the list of products with options to import/export CSV.
- * - Registration Modal: A modal for registering a new product with form fields.
  */
 
 "use client";
@@ -57,8 +27,12 @@ import {
   CardBody,
   Image,
   useDisclosure,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  addToast,
 } from "@heroui/react";
-import { Plus, Upload, Package, X, Search, Download as DownloadIcon, FileText } from "lucide-react";
+import { Plus, Upload, Package, X, Search, Download as DownloadIcon, FileText, Edit, Trash, Eye, Info, RefreshCw } from "lucide-react";
 import Papa from "papaparse";
 
 export default function MainPage() {
@@ -73,6 +47,8 @@ export default function MainPage() {
     supplier: "",
     code: "",
   });
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editingProduct, setEditingProduct] = React.useState(null);
 
   const [errors, setErrors] = React.useState({});
   const [submitted, setSubmitted] = React.useState(null);
@@ -80,17 +56,22 @@ export default function MainPage() {
   const csvInputRef = React.useRef(null);
   const [products, setProducts] = React.useState([]);
   const [suppliers, setSuppliers] = React.useState([]);
+  const [selectedProduct, setSelectedProduct] = React.useState(null);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
     setMounted(true);
 
     const fetchProducts = async () => {
+      setIsLoading(true);
       try {
         const res = await fetch("/api/regprods");
         const data = await res.json();
         setProducts(data);
       } catch (err) {
         console.error("Failed to load products:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -99,14 +80,12 @@ export default function MainPage() {
         const res = await fetch("/api/regforn");
         const data = await res.json();
 
-            // Map the API response to the format the Select expects
-    const formattedSuppliers = data.map((supplier: any) => ({
-      value: supplier.s_id.toString(), // or supplier.s_name
-      label: supplier.s_name
-    }));
-    
-      console.log("Formatted suppliers:", formattedSuppliers);
-    setSuppliers(formattedSuppliers);
+        const formattedSuppliers = data.map((supplier: any) => ({
+          value: supplier.s_id.toString(),
+          label: supplier.s_name
+        }));
+        
+        setSuppliers(formattedSuppliers);
       } catch (err) {
         console.error("Failed to load suppliers:", err);
       }
@@ -132,6 +111,36 @@ export default function MainPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // Open modal for adding new product
+  const handleAddProduct = () => {
+    setIsEditing(false);
+    setEditingProduct(null);
+    setFormData({
+      name: "",
+      description: "",
+      supplier: "",
+      code: "",
+    });
+    setImagePreview(null);
+    setErrors({});
+    onOpen();
+  };
+
+  // Open modal for editing existing product
+  const handleEditProduct = (product) => {
+    setIsEditing(true);
+    setEditingProduct(product);
+    setFormData({
+      name: product.p_name,
+      description: product.description,
+      supplier: product.p_type,
+      code: product.code,
+    });
+    setImagePreview(product.image || null);
+    setErrors({});
+    onOpen();
+  };
+
   const handleSubmit = async () => {
     if (!formData.name || !formData.description || !formData.supplier || !formData.code) {
       setErrors({ api: "Preencha todos os campos obrigatórios." });
@@ -143,42 +152,70 @@ export default function MainPage() {
       description: formData.description,
       code: formData.code,
       p_type: formData.supplier,
-      quantity: 0,
+      quantity: isEditing ? editingProduct.quantity : 0,
       image: imagePreview,
     };
 
     try {
-      const res = await fetch("/api/regprods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      let res;
+      if (isEditing) {
+        // Update existing product
+        res = await fetch(`/api/regprods?code=${editingProduct.code}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+      } else {
+        // Create new product
+        res = await fetch("/api/regprods", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+      }
 
       const result = await res.json();
 
       if (!res.ok) {
-        setErrors({
-          api: result.error || `Erro ao registrar produto (${res.status})`,
+        addToast({
+          title: "Erro",
+          description: result.error || `Erro ao ${isEditing ? 'atualizar' : 'registrar'} produto`,
+          color: "danger",
+          timeout: 5000,
         });
         return;
       }
 
-      setProducts((prev) => [result, ...prev]);
-      setSubmitted(result);
-      console.log("✅ Produto registrado:", result);
-
-      setFormData({
-        name: "",
-        description: "",
-        supplier: "",
-        code: "",
+      // Success toast
+      addToast({
+        title: "Sucesso!",
+        description: `Produto ${isEditing ? 'atualizado' : 'registrado'} com sucesso`,
+        color: "success",
+        timeout: 3000,
       });
+
+      // Update products list
+      if (isEditing) {
+        setProducts(prev => prev.map(p => 
+          p.code === editingProduct.code ? { ...p, ...data } : p
+        ));
+      } else {
+        setProducts((prev) => [result, ...prev]);
+      }
+
+      // Reset form and close modal
+      setFormData({ name: "", description: "", supplier: "", code: "" });
       setImagePreview(null);
       setErrors({});
       onOpenChange();
+      
     } catch (err) {
-      console.error(err);
-      setErrors({ api: "Erro de conexão com o servidor" });
+      addToast({
+        title: "Erro de Conexão",
+        description: "Não foi possível conectar ao servidor",
+        color: "danger",
+        timeout: 5000,
+      });
     }
   };
 
@@ -203,6 +240,13 @@ export default function MainPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    addToast({
+      title: "CSV Exportado",
+      description: `${products.length} produtos exportados com sucesso`,
+      color: "success",
+      timeout: 3000,
+    });
   };
 
   // Handle CSV Import
@@ -224,6 +268,7 @@ export default function MainPage() {
             image: null
           }));
 
+          let successCount = 0;
           for (const product of importedProducts) {
             if (product.p_name && product.code) {
               const res = await fetch("/api/regprods", {
@@ -235,24 +280,75 @@ export default function MainPage() {
               if (res.ok) {
                 const result = await res.json();
                 setProducts((prev) => [...prev, result]);
+                successCount++;
               }
             }
           }
 
-          alert(`${importedProducts.length} produtos importados com sucesso!`);
+          addToast({
+            title: "Importação Concluída",
+            description: `${successCount} produtos importados com sucesso!`,
+            color: "success",
+            timeout: 5000,
+          });
+
         } catch (err) {
           console.error("Erro ao importar CSV:", err);
-          alert("Erro ao importar CSV");
+          addToast({
+            title: "Erro na Importação",
+            description: "Erro ao importar CSV",
+            color: "danger",
+            timeout: 5000,
+          });
         }
       },
       error: (error) => {
         console.error("Erro ao ler CSV:", error);
-        alert("Erro ao ler arquivo CSV");
+        addToast({
+          title: "Erro no Arquivo",
+          description: "Erro ao ler arquivo CSV",
+          color: "danger",
+          timeout: 5000,
+        });
       }
     });
 
     if (csvInputRef.current) {
       csvInputRef.current.value = '';
+    }
+  };
+
+  // Handle product deletion
+  const handleDeleteProduct = async (product) => {
+    try {
+      const res = await fetch(`/api/regprods?code=${product.code}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setProducts(prev => prev.filter(p => p.code !== product.code));
+        addToast({
+          title: "Produto Excluído",
+          description: `${product.p_name} foi removido com sucesso`,
+          color: "success",
+          timeout: 3000,
+        });
+      } else {
+        const errorData = await res.json();
+        addToast({
+          title: "Erro",
+          description: errorData.error || "Não foi possível excluir o produto",
+          color: "danger",
+          timeout: 5000,
+        });
+      }
+    } catch (err) {
+      addToast({
+        title: "Erro de Conexão",
+        description: "Não foi possível conectar ao servidor",
+        color: "danger",
+        timeout: 5000,
+      });
     }
   };
 
@@ -262,6 +358,18 @@ export default function MainPage() {
     p.p_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Skeleton loader
+  const ProductSkeleton = () => (
+    <Card>
+      <CardBody className="flex flex-col items-center text-center gap-2">
+        <div className="w-32 h-32 bg-default-200 rounded-lg animate-pulse" />
+        <div className="h-4 bg-default-200 rounded w-3/4 animate-pulse" />
+        <div className="h-3 bg-default-200 rounded w-full animate-pulse" />
+        <div className="h-3 bg-default-200 rounded w-1/2 animate-pulse" />
+      </CardBody>
+    </Card>
   );
 
   return (
@@ -289,10 +397,10 @@ export default function MainPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Button color="primary" startContent={<Plus size={18} />} onPress={onOpen} className="hidden sm:flex">
+              <Button color="primary" startContent={<Plus size={18} />} onPress={handleAddProduct} className="hidden sm:flex">
                 Novo Produto
               </Button>
-              <Button color="primary" isIconOnly onPress={onOpen} className="sm:hidden">
+              <Button color="primary" isIconOnly onPress={handleAddProduct} className="sm:hidden">
                 <Plus size={20} />
               </Button>
             </div>
@@ -305,6 +413,43 @@ export default function MainPage() {
         <div className="mb-6">
           <h2 className="text-3xl font-bold text-foreground mb-2">Produtos</h2>
           <p className="text-default-500">Gerencie seus produtos e estoque</p>
+        </div>
+
+        {/* Statistics Dashboard */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card className="border-l-4 border-l-primary">
+            <CardBody className="p-4">
+              <p className="text-sm text-default-500">Total Produtos</p>
+              <p className="text-2xl font-bold">{products.length}</p>
+            </CardBody>
+          </Card>
+          
+          <Card className="border-l-4 border-l-success">
+            <CardBody className="p-4">
+              <p className="text-sm text-default-500">Em Estoque</p>
+              <p className="text-2xl font-bold">
+                {products.filter(p => p.quantity > 0).length}
+              </p>
+            </CardBody>
+          </Card>
+          
+          <Card className="border-l-4 border-l-warning">
+            <CardBody className="p-4">
+              <p className="text-sm text-default-500">Estoque Baixo</p>
+              <p className="text-2xl font-bold">
+                {products.filter(p => p.quantity > 0 && p.quantity <= 10).length}
+              </p>
+            </CardBody>
+          </Card>
+          
+          <Card className="border-l-4 border-l-danger">
+            <CardBody className="p-4">
+              <p className="text-sm text-default-500">Sem Estoque</p>
+              <p className="text-2xl font-bold">
+                {products.filter(p => p.quantity === 0).length}
+              </p>
+            </CardBody>
+          </Card>
         </div>
 
         {/* Search Bar and CSV Buttons */}
@@ -346,29 +491,118 @@ export default function MainPage() {
             >
               Exportar CSV
             </Button>
+            <Button
+              variant="flat"
+              color="primary"
+              startContent={<RefreshCw size={18} />}
+              onPress={() => window.location.reload()}
+            >
+              Atualizar
+            </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredProducts.length > 0 ? (
+          {isLoading ? (
+            Array.from({ length: 8 }).map((_, i) => <ProductSkeleton key={i} />)
+          ) : filteredProducts.length > 0 ? (
             filteredProducts.map((p) => (
-              <Card key={p.code}>
-                <CardBody className="flex flex-col items-center text-center gap-2">
-                  <Image
-                    src={p.image || "/placeholder.png"}
-                    alt={p.p_name}
-                    width={120}
-                    height={120}
-                    className="rounded-lg object-cover"
-                  />
-                  <h3 className="font-semibold">{p.p_name}</h3>
-                  <p className="text-sm text-default-500">{p.description}</p>
-                  <span className="text-xs text-default-400">Código: {p.code}</span>
-                </CardBody>
-              </Card>
+              <Popover key={p.code} placement="bottom" showArrow offset={10}>
+                <PopoverTrigger>
+                  <Card 
+                    className="cursor-pointer transition-all hover:scale-105 hover:shadow-lg"
+                    isPressable
+                  >
+                    <CardBody className="flex flex-col items-center text-center gap-2 p-4">
+                      <Image
+                        src={p.image || "/placeholder.png"}
+                        alt={p.p_name}
+                        width={120}
+                        height={120}
+                        className="rounded-lg object-cover"
+                      />
+                      <h3 className="font-semibold text-sm">{p.p_name}</h3>
+                      <p className="text-xs text-default-500 line-clamp-2">{p.description}</p>
+                      <span className="text-xs text-default-400">Código: {p.code}</span>
+                      
+                      {/* Stock status */}
+                      <div className={`px-2 py-1 rounded-full text-xs ${
+                        p.quantity > 10 ? 'bg-success-100 text-success-800' : 
+                        p.quantity > 0 ? 'bg-warning-100 text-warning-800' : 
+                        'bg-danger-100 text-danger-800'
+                      }`}>
+                        {p.quantity > 10 ? 'Em estoque' : p.quantity > 0 ? 'Estoque baixo' : 'Sem estoque'} ({p.quantity})
+                      </div>
+                    </CardBody>
+                  </Card>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="px-1 py-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Info size={18} className="text-primary" />
+                      <h3 className="text-lg font-bold">Detalhes do Produto</h3>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-semibold">Nome:</p>
+                        <p className="text-default-600">{p.p_name}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm font-semibold">Descrição:</p>
+                        <p className="text-default-600 text-sm">{p.description}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm font-semibold">Código:</p>
+                        <p className="text-default-600 font-mono">{p.code}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm font-semibold">Tipo/Fornecedor:</p>
+                        <p className="text-default-600">{p.p_type}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm font-semibold">Quantidade em Estoque:</p>
+                        <p className={`font-bold ${
+                          p.quantity > 10 ? 'text-success-600' : 
+                          p.quantity > 0 ? 'text-warning-600' : 
+                          'text-danger-600'
+                        }`}>
+                          {p.quantity} unidades
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-default-200">
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="flat"
+                        startContent={<Edit size={16} />}
+                        className="flex-1"
+                        onPress={() => handleEditProduct(p)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="flat"
+                        startContent={<Trash size={16} />}
+                        onPress={() => handleDeleteProduct(p)}
+                      >
+                        Excluir
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             ))
           ) : (
-            <Card className="border-2 border-dashed border-default-300">
+            <Card className="border-2 border-dashed border-default-300 col-span-full">
               <CardBody className="flex flex-col items-center justify-center h-48">
                 <Package size={48} className="text-default-400 mb-2" />
                 <p className="text-default-500">
@@ -380,7 +614,7 @@ export default function MainPage() {
                     color="primary"
                     variant="flat"
                     className="mt-2"
-                    onPress={onOpen}
+                    onPress={handleAddProduct}
                   >
                     Adicionar Produto
                   </Button>
@@ -391,15 +625,17 @@ export default function MainPage() {
         </div>
       </main>
 
-      {/* Registration Modal */}
+      {/* Registration/Edit Modal */}
       <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
         <ModalContent>
           {(onClose) => (
             <>
               <ModalHeader className="flex flex-col gap-1">
-                <h3 className="text-xl font-bold">Registrar Novo Produto</h3>
+                <h3 className="text-xl font-bold">
+                  {isEditing ? 'Editar Produto' : 'Registrar Novo Produto'}
+                </h3>
                 <p className="text-sm text-default-500 font-normal">
-                  Preencha as informações do produto
+                  {isEditing ? 'Atualize as informações do produto' : 'Preencha as informações do produto'}
                 </p>
               </ModalHeader>
               <ModalBody>
@@ -459,6 +695,8 @@ export default function MainPage() {
                     variant="bordered"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    isDisabled={isEditing} // Disable code editing to maintain consistency
+                    description={isEditing ? "O código do produto não pode ser alterado" : ""}
                   />
 
                   <div className="flex flex-col gap-2">
@@ -511,7 +749,7 @@ export default function MainPage() {
                   Cancelar
                 </Button>
                 <Button color="primary" onPress={handleSubmit}>
-                  Registrar Produto
+                  {isEditing ? 'Atualizar Produto' : 'Registrar Produto'}
                 </Button>
               </ModalFooter>
             </>
