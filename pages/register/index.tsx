@@ -1,4 +1,3 @@
-import { useRouter } from "next/navigation";
 import React from "react";
 import {
   Form,
@@ -11,14 +10,25 @@ import {
   addToast,
 } from "@heroui/react";
 
-export default function App() {
+interface FormData {
+  name: string;
+  email: string;
+  password: string;
+  country: string;
+  terms: string;
+}
+
+// Use Record type for ValidationErrors compatibility
+type Errors = Record<string, string>;
+
+export default function Register() {
   const [password, setPassword] = React.useState("");
-  const [submitted, setSubmitted] = React.useState(null);
-  const [errors, setErrors] = React.useState({});
+  const [submitted, setSubmitted] = React.useState<any>(null);
+  const [errors, setErrors] = React.useState<Errors>({});
   const [isLoading, setIsLoading] = React.useState(false);
-  const router = useRouter();
+
   // Real-time password validation
-  const getPasswordError = (value) => {
+  const getPasswordError = (value: string): string | null => {
     if (value.length < 4) {
       return "Senha precisa ter 4 caracteres ou mais";
     }
@@ -32,12 +42,21 @@ export default function App() {
     return null;
   };
 
-  const onSubmit = async (e) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.currentTarget));
+    const formData = new FormData(e.currentTarget);
+    
+    // Convert FormData to plain object with proper string conversion
+    const data: FormData = {
+      name: String(formData.get('name') || ''),
+      email: String(formData.get('email') || ''),
+      password: String(formData.get('password') || ''),
+      country: String(formData.get('country') || ''),
+      terms: String(formData.get('terms') || ''),
+    };
 
     // Custom validation checks
-    const newErrors = {};
+    const newErrors: Errors = {};
 
     // Password validation
     const passwordError = getPasswordError(data.password);
@@ -83,10 +102,7 @@ export default function App() {
         color: "success",
         timeout: 4000,
       });
-    setTimeout(() => {
-        router.push("/login");
-      }, 1000);
-      
+
       setSubmitted(result);
     } catch (err) {
       console.error(err);
@@ -104,6 +120,15 @@ export default function App() {
     }
   };
 
+  // Helper function to remove error for a specific field
+  const removeError = (fieldName: string) => {
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[fieldName];
+      return newErrors;
+    });
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <Form
@@ -112,57 +137,48 @@ export default function App() {
         onReset={() => setSubmitted(null)}
         onSubmit={onSubmit}
       >
-        <div className="flex flex-col gap-4 max-w-md">
-          {/* Logo and Brand Name Section */}
-          <div className="flex flex-col items-center gap-3 mb-6">
-            <div className="flex items-center gap-4">
-              <Image
-                src="./logo.png"
-                alt="Company Logo"
-                width={130}
-                height={80}
-                isBlurred
-              />
-              <h1 className="text-5xl font-bold text-foreground">
-                Atlas
-              </h1>
-            </div>
-          </div>
+         <div className="flex flex-col gap-4 max-w-md">
+                {/* Logo and Brand Name Section */}
+                <div className="flex flex-col items-center gap-3 mb-6">
+                  <div className="flex items-center gap-4">
+                    <Image
+                      src="./logo.png"
+                      alt="Company Logo"
+                      width={130}
+                      height={80}
+                      isBlurred
+                    />
+                    <h1 className="text-5xl font-bold text-foreground">
+                      Atlas
+                    </h1>
+                  </div>
+                </div>
+        
           
           <Input
             isRequired
-            errorMessage={({ validationDetails }) => {
-              if (validationDetails.valueMissing) {
-                return "Por favor digite seu nome";
-              }
-              return errors.name;
-            }}
+            errorMessage={errors.name}
             label="Nome"
             labelPlacement="outside"
             name="name"
             placeholder="Digite seu nome"
+            onValueChange={() => removeError('name')}
           />
 
           <Input
             isRequired
-            errorMessage={({ validationDetails }) => {
-              if (validationDetails.valueMissing) {
-                return "Por favor digite seu email";
-              }
-              if (validationDetails.typeMismatch) {
-                return "Por favor digite um email válido";
-              }
-            }}
+            errorMessage={errors.email}
             label="Email"
             labelPlacement="outside"
             name="email"
             placeholder="Digite seu Email"
             type="email"
+            onValueChange={() => removeError('email')}
           />
 
           <Input
             isRequired
-            errorMessage={getPasswordError(password)}
+            errorMessage={getPasswordError(password) || undefined}
             isInvalid={getPasswordError(password) !== null}
             label="Senha"
             labelPlacement="outside"
@@ -197,15 +213,19 @@ export default function App() {
             name="terms"
             validationBehavior="aria"
             value="true"
-            onValueChange={() =>
-              setErrors((prev) => ({ ...prev, terms: undefined }))
-            }
+            onValueChange={() => removeError('terms')}
           >
             Eu concordo com os termos e condições
           </Checkbox>
 
           {errors.terms && (
             <span className="text-danger text-small">{errors.terms}</span>
+          )}
+
+          {errors.api && (
+            <div className="text-danger text-small bg-danger-50 p-2 rounded-md">
+              {errors.api}
+            </div>
           )}
 
           <div className="flex gap-4">
@@ -228,4 +248,4 @@ export default function App() {
       </Form>
     </div>
   );
-}             
+}
