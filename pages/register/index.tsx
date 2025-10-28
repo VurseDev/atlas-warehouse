@@ -1,4 +1,5 @@
 import React from "react";
+import { useRouter } from "next/navigation";
 import {
   Form,
   Input,
@@ -7,15 +8,29 @@ import {
   Checkbox,
   Button,
   Image,
+  addToast,
 } from "@heroui/react";
 
-export default function App() {
+interface FormData {
+  name: string;
+  email: string;
+  password: string;
+  country: string;
+  terms: string;
+}
+
+// Use Record type for ValidationErrors compatibility
+type Errors = Record<string, string>;
+
+export default function Register() {
+  const router = useRouter();
   const [password, setPassword] = React.useState("");
-  const [submitted, setSubmitted] = React.useState(null);
-  const [errors, setErrors] = React.useState({});
+  const [submitted, setSubmitted] = React.useState<any>(null);
+  const [errors, setErrors] = React.useState<Errors>({});
+  const [isLoading, setIsLoading] = React.useState(false);
 
   // Real-time password validation
-  const getPasswordError = (value) => {
+  const getPasswordError = (value: string): string | null => {
     if (value.length < 4) {
       return "Senha precisa ter 4 caracteres ou mais";
     }
@@ -29,47 +44,98 @@ export default function App() {
     return null;
   };
 
-  const onSubmit = async (e) => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.currentTarget));
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    // Convert FormData to plain object with proper string conversion
+    const data: FormData = {
+      name: String(formData.get('name') || ''),
+      email: String(formData.get('email') || ''),
+      password: String(formData.get('password') || ''),
+      country: String(formData.get('country') || ''),
+      terms: String(formData.get('terms') || ''),
+    };
 
-  // Custom validation checks
-  const newErrors = {};
+    // Custom validation checks
+    const newErrors: Errors = {};
 
-  // Password validation
-  const passwordError = getPasswordError(data.password);
-  if (passwordError) newErrors.password = passwordError;
+    // Password validation
+    const passwordError = getPasswordError(data.password);
+    if (passwordError) newErrors.password = passwordError;
 
-  if (data.name === "admin") newErrors.name = "ta facil";
-  if (data.terms !== "true") newErrors.terms = "Por favor aceite os termos.";
+    if (data.name === "admin") newErrors.name = "ta facil";
+    if (data.terms !== "true") newErrors.terms = "Por favor aceite os termos.";
 
-  if (Object.keys(newErrors).length > 0) {
-    setErrors(newErrors);
-    return;
-  }
-
-  setErrors({});
-
-  try {
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setErrors({ api: result.error || "Erro ao registrar" });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
-    setSubmitted(result);
-  } catch (err) {
-    console.error(err);
-    setErrors({ api: "Erro de conexão com o servidor" });
-  }
-};
+    setErrors({});
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setErrors({ api: result.error || "Erro ao registrar" });
+        
+        // Toast de erro
+        addToast({
+          title: "Erro no Registro",
+          description: result.error || "Erro ao registrar",
+          color: "danger",
+          timeout: 5000,
+        });
+        return;
+      }
+
+      // Toast de sucesso
+      addToast({
+        title: "Registro realizado com sucesso!",
+        description: "Bem-vindo ao Atlas!",
+        color: "success",
+        timeout: 4000,
+      });
+
+      // Redirect to login after successful registration
+      setTimeout(() => {
+        router.push("/login");
+      }, 2000);
+
+      setSubmitted(result);
+    } catch (err) {
+      console.error(err);
+      setErrors({ api: "Erro de conexão com o servidor" });
+      
+      // Toast de erro de conexão
+      addToast({
+        title: "Erro de Conexão",
+        description: "Erro de conexão com o servidor",
+        color: "danger",
+        timeout: 5000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to remove error for a specific field
+  const removeError = (fieldName: string) => {
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[fieldName];
+      return newErrors;
+    });
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <Form
@@ -98,39 +164,28 @@ export default function App() {
           
           <Input
             isRequired
-            errorMessage={({ validationDetails }) => {
-              if (validationDetails.valueMissing) {
-                return "Por favor digite seu nome";
-              }
-
-              return errors.name;
-            }}
+            errorMessage={errors.name}
             label="Nome"
             labelPlacement="outside"
             name="name"
             placeholder="Digite seu nome"
+            onValueChange={() => removeError('name')}
           />
 
           <Input
             isRequired
-            errorMessage={({ validationDetails }) => {
-              if (validationDetails.valueMissing) {
-                return "Por favor digite seu email";
-              }
-              if (validationDetails.typeMismatch) {
-                return "Por favor digite um email válido";
-              }
-            }}
+            errorMessage={errors.email}
             label="Email"
             labelPlacement="outside"
             name="email"
             placeholder="Digite seu Email"
             type="email"
+            onValueChange={() => removeError('email')}
           />
 
           <Input
             isRequired
-            errorMessage={getPasswordError(password)}
+            errorMessage={getPasswordError(password) || undefined}
             isInvalid={getPasswordError(password) !== null}
             label="Senha"
             labelPlacement="outside"
@@ -165,9 +220,7 @@ export default function App() {
             name="terms"
             validationBehavior="aria"
             value="true"
-            onValueChange={() =>
-              setErrors((prev) => ({ ...prev, terms: undefined }))
-            }
+            onValueChange={() => removeError('terms')}
           >
             Eu concordo com os termos e condições
           </Checkbox>
@@ -176,10 +229,35 @@ export default function App() {
             <span className="text-danger text-small">{errors.terms}</span>
           )}
 
+          {errors.api && (
+            <div className="text-danger text-small bg-danger-50 p-2 rounded-md">
+              {errors.api}
+            </div>
+          )}
+
           <div className="flex gap-4">
-            <Button className="w-full" color="primary" type="submit">
-              Registrar-se
+            <Button 
+              className="w-full" 
+              color="primary" 
+              type="submit"
+              isLoading={isLoading}
+            >
+              {isLoading ? "Registrando..." : "Registrar-se"}
             </Button>
+          </div>
+
+          {/* Navigation link to login */}
+          <div className="text-center mt-4">
+            <p className="text-sm text-default-500">
+              Já tem uma conta?{" "}
+              <button
+                type="button"
+                className="text-blue-600 hover:underline cursor-pointer"
+                onClick={() => router.push("/login")}
+              >
+                Faça login
+              </button>
+            </p>
           </div>
         </div>
 
