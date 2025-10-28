@@ -8,6 +8,21 @@
  * @returns {JSX.Element} The rendered MainPage component.
  */
 
+interface Product {
+  p_id?: number;
+  code: string;
+  p_name: string;
+  description: string;
+  p_type: string;
+  quantity: number;
+  image?: string | null;
+}
+
+interface Supplier {
+  value: string;
+  label: string;
+}
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -319,7 +334,7 @@ export default function MainPage() {
   };
 
   // Handle product deletion
-  const handleDeleteProduct = async (product) => {
+  const handleDeleteProduct = async (product: Product) => {
     try {
       const res = await fetch(`/api/regprods?code=${product.code}`, {
         method: "DELETE",
