@@ -52,7 +52,7 @@ export default function MainPage() {
 
   const [errors, setErrors] = React.useState({});
   const [submitted, setSubmitted] = React.useState(null);
-  const fileInputRef = React.useRef(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const csvInputRef = React.useRef(null);
   const [products, setProducts] = React.useState([]);
   const [suppliers, setSuppliers] = React.useState([]);
