@@ -410,7 +410,7 @@ export default function MainPage() {
                 <h1 className="text-xl font-bold text-foreground">Atlas</h1>
               </div>
               <div className="hidden lg:flex gap-1">
-                <Button variant="light" onPress={() => router.push("/main/index")}>Produtos</Button>
+                <Button variant="light" onPress={() => router.push("/main")}>Produtos</Button>
                 <Button variant="light" onPress={() => router.push("/main/estoque")}>Estoque</Button>
                 <Button variant="light">Relatórios</Button>
               </div>
